@@ -17,6 +17,13 @@ class PlayerManager(BaseUserManager):
         return self.create_user(phone, password, **extra_fields)
 
 class Player(AbstractBaseUser, PermissionsMixin):
+    class League(models.TextChoices):
+        NO_LEAGUE = 'no_league', 'No League'
+        BRONZE = 'bronze', 'Bronze'
+        SILVER = 'silver', 'Silver'
+        GOLD = 'gold', 'Gold'
+        MASTER = 'master', 'Master'
+
     phone = models.CharField(max_length=11, unique=True, verbose_name='Phone Number')
     name = models.CharField(max_length=50, verbose_name='Full Name')
     display_name = models.CharField(max_length=50, verbose_name='Display Name')
@@ -25,6 +32,8 @@ class Player(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False, verbose_name='Staff Status')
     is_superuser = models.BooleanField(default=False, verbose_name='Superuser Status')
 
+    score = models.IntegerField(default=0, verbose_name='Score')
+    league = models.CharField(max_length=10, choices=League.choices, default=League.NO_LEAGUE, verbose_name='League')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Created At')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Updated At')
 
@@ -32,6 +41,19 @@ class Player(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['name', 'display_name']
 
     objects = PlayerManager()
+
+    def save(self, *args, **kwargs):
+        if self.score < 1000:
+            self.league = self.League.NO_LEAGUE
+        elif 1000 <= self.score < 2000:
+            self.league = self.League.BRONZE
+        elif 2000 <= self.score < 3500:
+            self.league = self.League.SILVER
+        elif 3500 <= self.score < 6000:
+            self.league = self.League.GOLD
+        else:
+            self.league = self.League.MASTER
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.display_name
