@@ -16,10 +16,13 @@ class PlayerAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('phone', 'name', 'display_name', 'is_active')
+            'fields': ('phone', 'name', 'display_name')
         }),
         ('Game', {
             'fields': ('score', 'league'),
+        }),
+        ('Permissions', {
+            'fields': ('is_active', 'is_staff', 'is_superuser'),
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
