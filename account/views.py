@@ -38,6 +38,7 @@ class PlayerUpdateView(UpdateAPIView):
     queryset = Player.objects.all()
     serializer_class = PlayerSerializer
     permission_classes = [IsAccountOwnerOrAdmin]
+    authentication_classes = [BasicAuthentication]
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', True)
