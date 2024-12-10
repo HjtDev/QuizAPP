@@ -11,7 +11,9 @@ button_style = ft.ButtonStyle(
 )
 
 CREDENTIALS_FILE = "credentials.txt"
-API_URL = "http://localhost:8000/api/account/login/"
+user_id = None
+user_phone = None
+user_password = None
 
 def main(page: ft.Page):
     page.title = "Quiz Application"
@@ -20,12 +22,18 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
 
     if os.path.exists(CREDENTIALS_FILE):
-        with open(CREDENTIALS_FILE, 'r') as f:
-            phone, password = f.read().strip().split(',')
-            if authenticate_user(page, phone, password):
-                show_main_menu(page)
-            else:
-                show_login_form(page, phone, password)  # Retain values on failure
+        try:
+            with open(CREDENTIALS_FILE, 'r') as f:
+                phone, password = f.read().strip().split(',')
+                if authenticate_user(page, phone, password):
+                    global user_phone, user_password
+                    user_phone = phone
+                    user_password = password
+                    show_main_menu(page)
+                else:
+                    show_login_form(page, phone, password)
+        except ValueError:
+            show_login_form(page)
     else:
         show_login_form(page)
 
@@ -34,8 +42,8 @@ def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_me
 
     title = ft.Text("Login", size=30, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
 
-    phone_field = ft.TextField(label="Phone", value=phone, autofocus=True)  # Set value to retain input
-    password_field = ft.TextField(label="Password", value=password, password=True)  # Set value to retain input
+    phone_field = ft.TextField(label="Phone", value=phone, autofocus=True)
+    password_field = ft.TextField(label="Password", value=password, password=True)
     remember_me = ft.Checkbox(label="Remember Me")
 
     if error_message:
@@ -43,9 +51,13 @@ def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_me
         page.add(error_text)
 
     def on_login_click(e):
+        global user_phone, user_password
         phone_value = phone_field.value
         password_value = password_field.value
         if authenticate_user(page, phone_value, password_value):
+            user_phone = phone_value
+            user_password = password_value
+
             if remember_me.value:
                 with open(CREDENTIALS_FILE, 'w') as f:
                     f.write(f"{phone_value},{password_value}")
@@ -56,15 +68,17 @@ def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_me
     page.add(title, phone_field, password_field, remember_me, login_button)
 
 def authenticate_user(page: ft.Page, phone: str, password: str) -> bool:
-    response = requests.post(API_URL, json={"phone": phone, "password": password})
+    response = requests.post("http://localhost:8000/api/account/login/", json={"phone": phone, "password": password})
 
     if response.status_code == 200:
         player_data = response.json()
-        print("Authentication successful:", player_data)  # Handle player data as needed
+        global user_id
+        user_id = player_data['id']
+        print("Authentication successful:", player_data)
         return True
     else:
-        print("Authentication failed")  # Log for debugging purposes
-        show_login_form(page, phone, password, "Invalid credentials")  # Show error message and retain inputs
+        print("Authentication failed")
+        show_login_form(page, phone, password, "Invalid credentials")
         return False
 
 def show_main_menu(page: ft.Page):
