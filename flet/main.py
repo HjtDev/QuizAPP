@@ -17,8 +17,8 @@ CREDENTIALS_FILE = "credentials.txt"
 user_id = None
 user_phone = None
 user_password = None
-user_name = None  # Variable to store user's name
-user_display_name = None  # Variable to store user's display name
+user_name = None
+user_display_name = None
 
 
 def main(page: ft.Page):
@@ -46,9 +46,7 @@ def main(page: ft.Page):
 
 def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_message: str = ""):
     page.clean()
-
     title = ft.Text("Login", size=30, weight=ft.FontWeight.BOLD, color=text_color)
-
     phone_field = ft.TextField(label="Phone", value=phone, autofocus=True)
     password_field = ft.TextField(label="Password", value=password, password=True)
     remember_me = ft.Checkbox(label="Remember Me")
@@ -71,7 +69,6 @@ def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_me
             show_main_menu(page)
 
     login_button = ft.ElevatedButton("Login", on_click=on_login_click, style=button_style)
-
     page.add(title, phone_field, password_field, remember_me, login_button)
 
 
@@ -80,14 +77,12 @@ def authenticate_user(page: ft.Page, phone: str, password: str) -> bool:
 
     if response.status_code == 200:
         player_data = response.json()
-        global user_id, user_name, user_display_name  # Declare global variables to store user data
+        global user_id, user_name, user_display_name
         user_id = player_data['id']
-        user_name = player_data['name']  # Store user's name
-        user_display_name = player_data['display_name']  # Store user's display name
-        print("Authentication successful:", player_data)
+        user_name = player_data['name']
+        user_display_name = player_data['display_name']
         return True
     else:
-        print("Authentication failed")
         show_login_form(page, phone, password, "Invalid credentials")
         return False
 
@@ -97,7 +92,8 @@ def show_main_menu(page: ft.Page):
 
     title = ft.Text("Welcome to the Quiz App", size=30, weight=ft.FontWeight.BOLD, color=text_color)
 
-    start_quiz_button = ft.ElevatedButton("Start a Quiz", on_click=start_quiz, style=button_style, width=200)
+    start_quiz_button = ft.ElevatedButton("Start a Quiz", on_click=lambda e: show_start_quiz_menu(page),
+                                          style=button_style, width=200)
     make_quiz_button = ft.ElevatedButton("Make a Quiz", on_click=make_quiz, style=button_style, width=200)
     account_button = ft.ElevatedButton("Account", on_click=lambda e: show_account_info(page), style=button_style,
                                        width=200)
@@ -119,7 +115,6 @@ def show_account_info(page: ft.Page):
             player_data = response.json()
             display_account_info(page, player_data)
         else:
-            print("Failed to retrieve account information.")
             page.add(ft.Text("Error retrieving account information.", color=ft.Colors.RED))
     else:
         page.add(ft.Text("User not authenticated.", color=ft.Colors.RED))
@@ -130,7 +125,6 @@ def display_account_info(page: ft.Page, player_data):
 
     title = ft.Text("Account Information", size=30, weight=ft.FontWeight.BOLD, color=text_color)
 
-    # Directly capitalize the league value
     league_name = player_data['league'].replace('_', ' ').title()
 
     info_list = [
@@ -138,7 +132,7 @@ def display_account_info(page: ft.Page, player_data):
         ("Name:", player_data['name']),
         ("Display Name:", player_data['display_name']),
         ("Score:", str(player_data['score'])),
-        ("League:", league_name)  # Use the capitalized league name
+        ("League:", league_name)
     ]
 
     card_content = []
@@ -165,7 +159,7 @@ def display_account_info(page: ft.Page, player_data):
     back_to_menu_button = ft.ElevatedButton("Back to Main Menu", on_click=lambda e: show_main_menu(page),
                                             style=button_style)
 
-    button_row = ft.Row([update_button, back_to_menu_button], alignment=ft.MainAxisAlignment.CENTER)  # Center buttons
+    button_row = ft.Row([update_button, back_to_menu_button], alignment=ft.MainAxisAlignment.CENTER)
 
     page.add(title, info_card_container, button_row)
 
@@ -175,10 +169,9 @@ def show_update_info(page: ft.Page):
 
     title = ft.Text("Update Information", size=30, weight=ft.FontWeight.BOLD, color=text_color)
 
-    phone_field = ft.TextField(label="Phone", value=user_phone)  # Pre-fill with current phone number
-    name_field = ft.TextField(label="Name", value=user_name)  # Pre-fill with current name
-    display_name_field = ft.TextField(label="Display Name",
-                                      value=user_display_name)  # Pre-fill with current display name
+    phone_field = ft.TextField(label="Phone", value=user_phone)
+    name_field = ft.TextField(label="Name", value=user_name)
+    display_name_field = ft.TextField(label="Display Name", value=user_display_name)
 
     save_button = ft.ElevatedButton("Save", on_click=lambda e: update_user_info(phone_field.value, name_field.value,
                                                                                 display_name_field.value, page),
@@ -187,13 +180,13 @@ def show_update_info(page: ft.Page):
     back_button = ft.ElevatedButton("Back to Account Info", on_click=lambda e: show_account_info(page),
                                     style=button_style)
 
-    button_row = ft.Row([save_button, back_button], alignment=ft.MainAxisAlignment.CENTER)  # Center buttons
+    button_row = ft.Row([save_button, back_button], alignment=ft.MainAxisAlignment.CENTER)
 
     page.add(title, phone_field, name_field, display_name_field, button_row)
 
 
 def update_user_info(updated_phone: str, updated_name: str, updated_display_name: str, page: ft.Page):
-    global user_phone, user_name, user_display_name  # Declare globals to modify them
+    global user_phone, user_name, user_display_name
 
     data_to_update = {
         "phone": updated_phone,
@@ -205,21 +198,14 @@ def update_user_info(updated_phone: str, updated_name: str, updated_display_name
                               auth=(user_phone, user_password))
 
     if response.status_code == 200:
-        print("User information updated successfully.")
-
-        # Update local variables after successful update
         user_phone = updated_phone
         user_name = updated_name
         user_display_name = updated_display_name
 
-        # Return to account info after successful update
-        show_account_info(page)  # Pass the current page context
+        show_account_info(page)
 
     else:
-        print("Failed to update user information.")
-
-        # Show error message on the update page
-        error_message = response.json()  # Get actual error message from response
+        error_message = response.json()
         error_display_text = ""
 
         if 'phone' in error_message:
@@ -231,11 +217,67 @@ def update_user_info(updated_phone: str, updated_name: str, updated_display_name
         if 'display_name' in error_message:
             error_display_text += "\n".join(error_message['display_name']) + "\n"
 
-        page.add(ft.Text(error_display_text.strip(), color=ft.Colors.RED))  # Display error messages
+        page.add(ft.Text(error_display_text.strip(), color=ft.Colors.RED))
 
 
-def start_quiz(e):
-    print("Starting a quiz...")
+def show_start_quiz_menu(page: ft.Page):
+    page.clean()
+
+    title = ft.Text("Available Quizzes", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+    reload_button = ft.ElevatedButton("Reload", on_click=lambda e: load_quizzes(page), style=button_style)
+
+    quiz_list_container = ft.Column()
+
+    page.add(title, reload_button, quiz_list_container)
+
+    load_quizzes(page)
+
+    back_button = ft.ElevatedButton("Back to Main Menu", on_click=lambda e: show_main_menu(page), style=button_style)
+    page.add(back_button)
+
+
+def load_quizzes(page: ft.Page):
+    try:
+        response = requests.get("http://localhost:8000/api/quiz/", auth=(user_phone, user_password))
+        response.raise_for_status()
+
+        data = response.json()
+        quizzes = data.get('results', [])
+
+        page.controls[2].controls.clear()
+
+        if quizzes:
+            for quiz in quizzes:
+                author_display_name = quiz['author']['display_name']
+                quiz_info = f"{quiz['title']} by {author_display_name} | Score: {quiz['score']}"
+
+                quiz_box = ft.Container(
+                    content=ft.Row([
+                        ft.Column([
+                            ft.Text(quiz['title'], size=20, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"By: {author_display_name}", size=16),
+                            ft.Text(f"Score: {quiz['score']}", size=16),
+                        ], alignment=ft.MainAxisAlignment.START),
+                        ft.ElevatedButton("Play", on_click=lambda e: None, style=button_style)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    bgcolor=card_color,
+                    border_radius=10,
+                    margin=10,
+                    padding=15,
+                    shadow=[ft.BoxShadow(blur_radius=10, color="rgba(0, 0, 0, 0.2)", offset=ft.Offset(0, 4))]
+                )
+
+                page.controls[2].controls.append(quiz_box)
+
+            page.update()
+        else:
+            page.controls[2].controls.append(ft.Text("No available quizzes.", size=20))
+            page.update()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching quizzes: {e}")
+        page.controls[2].controls.append(ft.Text("Failed to load quizzes.", color=ft.Colors.RED))
+        page.update()
 
 
 def make_quiz(e):

@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 
 class QuizViewSet(ModelViewSet):
-    queryset = Quiz.objects.all()
+    queryset = Quiz.objects.filter(verified=True)
     serializer_class = QuizSerializer
 
     def get_permissions(self, *args, **kwargs):
