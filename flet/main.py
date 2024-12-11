@@ -236,6 +236,54 @@ def show_start_quiz_menu(page: ft.Page):
     page.add(back_button)
 
 
+def show_quiz_details(page: ft.Page, quiz_id: int):
+    page.clean()
+
+    try:
+        response = requests.get(f"http://localhost:8000/api/quiz/{quiz_id}", auth=(user_phone, user_password))
+        response.raise_for_status()
+
+        quiz_data = response.json()
+
+        title = ft.Text(quiz_data['title'], size=30, weight=ft.FontWeight.BOLD, color=text_color)
+        author_text = ft.Text(f"Author: {quiz_data['author']['display_name']}", size=20)
+        description_text = ft.Text(f"Description: {quiz_data['description']}", size=16)
+        available_time_text = ft.Text(f"Available Time: {quiz_data['available_time']}", size=16)
+        score_text = ft.Text(f"Score: {quiz_data['score']}", size=16)
+
+        created_at_date = quiz_data['created_at'].split("T")[0]
+        created_at_text = ft.Text(f"Created At: {created_at_date}", size=16)
+
+        back_button = ft.ElevatedButton("Back", on_click=lambda e: show_start_quiz_menu(page), style=button_style)
+        start_button = ft.ElevatedButton("Start", on_click=lambda e: None, style=button_style)
+
+        button_row = ft.Row([back_button, start_button], alignment=ft.MainAxisAlignment.CENTER)
+
+        info_container = ft.Container(
+            content=ft.Column([
+                title,
+                author_text,
+                description_text,
+                available_time_text,
+                score_text,
+                created_at_text,
+                button_row
+            ], alignment=ft.MainAxisAlignment.START),
+            bgcolor=card_color,
+            border_radius=10,
+            margin=10,
+            padding=15,
+            shadow=[ft.BoxShadow(blur_radius=10, color="rgba(0, 0, 0, 0.2)", offset=ft.Offset(0, 4))]
+        )
+
+        page.add(info_container)
+        page.update()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching quiz details: {e}")
+        page.add(ft.Text("Failed to load quiz details.", color=ft.Colors.RED))
+
+
 def load_quizzes(page: ft.Page):
     try:
         response = requests.get("http://localhost:8000/api/quiz/", auth=(user_phone, user_password))
@@ -251,6 +299,10 @@ def load_quizzes(page: ft.Page):
                 author_display_name = quiz['author']['display_name']
                 quiz_info = f"{quiz['title']} by {author_display_name} | Score: {quiz['score']}"
 
+                play_button = ft.ElevatedButton("Play",
+                                                on_click=lambda e, quiz_id=quiz['id']: show_quiz_details(page, quiz_id),
+                                                style=button_style)
+
                 quiz_box = ft.Container(
                     content=ft.Row([
                         ft.Column([
@@ -258,7 +310,7 @@ def load_quizzes(page: ft.Page):
                             ft.Text(f"By: {author_display_name}", size=16),
                             ft.Text(f"Score: {quiz['score']}", size=16),
                         ], alignment=ft.MainAxisAlignment.START),
-                        ft.ElevatedButton("Play", on_click=lambda e: None, style=button_style)
+                        play_button
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     bgcolor=card_color,
                     border_radius=10,
