@@ -131,7 +131,7 @@ def display_account_info(page: ft.Page, player_data):
     title = ft.Text("Account Information", size=30, weight=ft.FontWeight.BOLD, color=text_color)
 
     # Directly capitalize the league value
-    league_name = player_data['league'].capitalize()  # Capitalize the league name directly
+    league_name = player_data['league'].replace('_', ' ').title()
 
     info_list = [
         ("Phone:", player_data['phone']),
