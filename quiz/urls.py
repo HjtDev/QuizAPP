@@ -12,4 +12,6 @@ router.register('', views.QuizViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('<int:quiz>/questions/', views.QuestionView.as_view(), name='questions'),
+    path('start_quiz/', views.GameStarterView.as_view(), name='start_quiz'),
+    path('finish_quiz/', views.GameEndView.as_view(), name='finish_quiz'),
 ]
