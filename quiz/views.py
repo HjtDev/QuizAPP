@@ -97,6 +97,9 @@ class GameStarterView(APIView):
             if not quiz.verified:
                 raise PermissionDenied("Quiz is not verified.")
 
+            if f'player_{player_id}:{quiz_id}' in cache.keys('*'):
+                raise PermissionDenied("Quiz already started.")
+
             cache.set(f'player_{player_id}:{quiz_id}', quiz.score, timeout=int(quiz.available_time.total_seconds()))
 
         except Quiz.DoesNotExist:
@@ -128,7 +131,7 @@ class GameEndView(APIView):
             reward = self.calculate_reward(answers, questions, score, number_of_questions)
 
             player = Player.objects.get(pk=player_id)
-            player.score += int(reward)
+            player.score += reward
             player.save()
 
             cache.delete(f'player_{player_id}:{quiz_id}')
@@ -144,9 +147,8 @@ class GameEndView(APIView):
         reward = 0
         for question_id, answer in answers.items():
             try:
-                correct_answer = questions.get(pk=question_id).correct_answer
-                if answer == correct_answer:
+                if answer == questions.get(pk=int(question_id)).correct_answer:
                     reward += score / number_of_questions
             except Question.DoesNotExist:
                 continue
-        return reward
+        return int(reward)
