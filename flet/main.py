@@ -95,7 +95,8 @@ def show_main_menu(page: ft.Page):
 
     start_quiz_button = ft.ElevatedButton("Start a Quiz", on_click=lambda e: show_start_quiz_menu(page),
                                           style=button_style, width=200)
-    make_quiz_button = ft.ElevatedButton("Make a Quiz", on_click=make_quiz, style=button_style, width=200)
+    make_quiz_button = ft.ElevatedButton("Make a Quiz", on_click=lambda e: show_make_quiz_menu(page),
+                                         style=button_style, width=200)
     account_button = ft.ElevatedButton("Account", on_click=lambda e: show_account_info(page), style=button_style,
                                        width=200)
     exit_button = ft.ElevatedButton("Exit", on_click=lambda e: page.window_destroy(), style=button_style, width=200)
@@ -452,8 +453,346 @@ def load_quizzes(page: ft.Page):
         page.update()
 
 
-def make_quiz(e):
-    print("Making a quiz...")
+def show_make_quiz_menu(page: ft.Page):
+    page.clean()  # Clear current content
+
+    title = ft.Text("My Quizzes", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    # Fetch quizzes for the player
+    try:
+        response = requests.get(f"http://localhost:8000/api/quiz/{user_id}/my_quizzes",
+                                auth=(user_phone, user_password))
+        response.raise_for_status()
+        quizzes_data = response.json()
+
+        quiz_list = ft.Column()  # To hold the list of quizzes
+
+        if quizzes_data:
+            for quiz in quizzes_data:
+                author_display_name = quiz['author']['display_name']
+                verified_text = ft.Text("Verified", color=ft.Colors.GREEN) if quiz['verified'] else ft.Text(
+                    "Not Verified", color=ft.Colors.RED)
+
+                edit_button = ft.ElevatedButton("Edit", on_click=lambda e, quiz_id=quiz['id']: edit_quiz(page, quiz_id),
+                                                style=button_style)
+
+                quiz_container = ft.Container(
+                    content=ft.Row([
+                        ft.Column([
+                            ft.Text(quiz['title'], size=20, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"By: {author_display_name}", size=16),
+                            verified_text
+                        ], alignment=ft.MainAxisAlignment.START),
+                        edit_button
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    bgcolor=card_color,
+                    border_radius=10,
+                    margin=10,
+                    padding=15,
+                    shadow=[ft.BoxShadow(blur_radius=10, color="rgba(0, 0, 0, 0.2)", offset=ft.Offset(0, 4))]
+                )
+
+                quiz_list.controls.append(quiz_container)
+
+        else:
+            quiz_list.controls.append(ft.Text("No quizzes found.", size=20))
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching quizzes: {e}")
+        quiz_list.controls.append(ft.Text("Failed to load quizzes.", color=ft.Colors.RED))
+
+    # Add buttons for adding a new quiz and going back
+    add_quiz_button = ft.ElevatedButton("Add Quiz", on_click=lambda e: show_add_quiz_page(page), style=button_style)
+    back_button = ft.ElevatedButton("Back to Main Menu", on_click=lambda e: show_main_menu(page), style=button_style)
+
+    page.add(title, quiz_list, add_quiz_button, back_button)
+    page.update()
+
+
+def show_add_quiz_page(page: ft.Page):
+    page.clean()  # Clear current content
+
+    title = ft.Text("Add a New Quiz", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    # Input fields for quiz details
+    quiz_title_field = ft.TextField(label="Quiz Title", autofocus=True)
+    quiz_description_field = ft.TextField(label="Description", multiline=True)
+    available_time_field = ft.TextField(label="Available Time (HH:MM:SS)", value="00:10:00")  # Default to 10 minutes
+
+    def save_quiz(e):
+        data = {
+            "title": quiz_title_field.value,
+            "description": quiz_description_field.value,
+            "available_time": available_time_field.value  # Ensure it's in HH:MM:SS format
+        }
+
+        try:
+            response = requests.post("http://localhost:8000/api/quiz/", json=data, auth=(user_phone, user_password))
+            if response.status_code == 201:
+                page.add(ft.Text("Quiz created successfully!", color=ft.Colors.GREEN))
+                show_make_quiz_menu(page)  # Navigate back to the quizzes menu
+            else:
+                error_message = response.json().get('error', 'An unknown error occurred.')
+                page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error creating quiz: {e}")
+            page.add(ft.Text("Failed to create quiz.", color=ft.Colors.RED))
+
+    save_button = ft.ElevatedButton("Save", on_click=save_quiz, style=button_style)
+    cancel_button = ft.ElevatedButton("Cancel", on_click=lambda e: show_make_quiz_menu(page), style=button_style)
+
+    page.add(title, quiz_title_field, quiz_description_field, available_time_field, save_button, cancel_button)
+    page.update()
+
+
+def edit_quiz(page: ft.Page, quiz_id):
+    show_edit_quiz_page(page, quiz_id)  # Call the function to show the edit page
+
+
+def show_edit_quiz_page(page: ft.Page, quiz_id: int):
+    page.clean()  # Clear current content
+
+    title = ft.Text("Edit Quiz", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    # Fetch quiz details
+    try:
+        response = requests.get(f"http://localhost:8000/api/quiz/{quiz_id}/", auth=(user_phone, user_password))
+        response.raise_for_status()
+        quiz_data = response.json()
+
+        # Display quiz information
+        quiz_title_field = ft.TextField(label="Quiz Title", value=quiz_data['title'], autofocus=True)
+        quiz_description_field = ft.TextField(label="Description", value=quiz_data['description'], multiline=True)
+        available_time_field = ft.TextField(label="Available Time (HH:MM:SS)", value=quiz_data['available_time'])
+
+        # Display additional information
+        score_text = ft.Text(f"Score: {quiz_data['score']}", size=16)
+        created_at_date = quiz_data['created_at'].split("T")[0]  # Extract date part
+        created_at_text = ft.Text(f"Created At: {created_at_date}", size=16)
+        updated_at_date = quiz_data['updated_at'].split("T")[0]  # Extract date part
+        updated_at_text = ft.Text(f"Updated At: {updated_at_date}", size=16)
+        verified_text = ft.Text("Verified" if quiz_data['verified'] else "Not Verified",
+                                color=ft.Colors.GREEN if quiz_data['verified'] else ft.Colors.RED)
+
+        # Back button to return to the previous menu
+        back_button = ft.ElevatedButton("Back", on_click=lambda e: show_make_quiz_menu(page), style=button_style)
+
+        # Add question button (no functionality for now)
+        add_question_button = ft.ElevatedButton("Add Question",
+                                                on_click=lambda e: show_add_question_page(page, quiz_id),
+                                                style=button_style)
+
+        # Save button to update quiz details
+        def save_quiz(e):
+            data = {
+                "title": quiz_title_field.value,
+                "description": quiz_description_field.value,
+                "available_time": available_time_field.value  # Ensure it's in HH:MM:SS format
+            }
+
+            try:
+                response = requests.patch(f"http://localhost:8000/api/quiz/{quiz_id}/", json=data,
+                                          auth=(user_phone, user_password))
+                if response.status_code == 200:
+                    page.add(ft.Text("Quiz updated successfully!", color=ft.Colors.GREEN))
+                    show_make_quiz_menu(page)  # Navigate back to the quizzes menu
+                else:
+                    error_message = response.json().get('error', 'An unknown error occurred.')
+                    page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error updating quiz: {e}")
+                page.add(ft.Text("Failed to update quiz.", color=ft.Colors.RED))
+
+        save_button = ft.ElevatedButton("Save", on_click=save_quiz, style=button_style)
+
+        # Fetch questions for this quiz
+        questions_container = ft.Column()  # To hold the list of questions
+        try:
+            questions_response = requests.get(f"http://localhost:8000/api/quiz/{quiz_id}/questions",
+                                              auth=(user_phone, user_password))
+            questions_response.raise_for_status()
+            questions_data = questions_response.json()
+
+            if questions_data:
+                for question in questions_data:
+                    question_title = ft.Text(question['question'], size=20)
+                    edit_question_button = ft.ElevatedButton("Edit",
+                                                             on_click=lambda e,
+                                                                             question_id=question['id']: edit_question(
+                                                                 page, question_id, quiz_id),
+                                                             style=button_style)
+
+                    question_container = ft.Container(
+                        content=ft.Row([
+                            question_title,
+                            edit_question_button
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        bgcolor=card_color,
+                        border_radius=10,
+                        margin=10,
+                        padding=10,
+                        shadow=[ft.BoxShadow(blur_radius=5, color="rgba(0, 0, 0, 0.2)", offset=ft.Offset(0, 2))]
+                    )
+
+                    questions_container.controls.append(question_container)
+
+            else:
+                questions_container.controls.append(ft.Text("No questions found.", size=20))
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching questions: {e}")
+            questions_container.controls.append(ft.Text("Failed to load questions.", color=ft.Colors.RED))
+
+        # Add all components to the page
+        page.add(title,
+                 quiz_title_field,
+                 quiz_description_field,
+                 available_time_field,
+                 score_text,
+                 created_at_text,
+                 updated_at_text,
+                 verified_text,
+                 save_button,
+                 add_question_button,
+                 back_button,
+                 questions_container)
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching quiz details: {e}")
+        page.add(ft.Text("Failed to load quiz details.", color=ft.Colors.RED))
+
+    page.update()
+
+
+def edit_question(page: ft.Page, question_id: int, quiz_id: int):
+    show_edit_question_page(page, quiz_id, question_id)  # Call the function to show the edit page
+
+
+def show_edit_question_page(page: ft.Page, quiz_id: int, question_id: int):
+    page.clean()  # Clear current content
+
+    title = ft.Text("Edit Question", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    # Fetch question details
+    try:
+        response = requests.get(f"http://localhost:8000/api/quiz/{quiz_id}/questions/",
+                                json={"id": question_id},
+                                auth=(user_phone, user_password))
+        response.raise_for_status()
+        question_data = response.json()
+
+        # Display question information
+        question_field = ft.TextField(label="Question", value=question_data['question'], autofocus=True)
+        option_a_field = ft.TextField(label="Option A", value=question_data['option_a'])
+        option_b_field = ft.TextField(label="Option B", value=question_data['option_b'])
+        option_c_field = ft.TextField(label="Option C", value=question_data['option_c'])
+        option_d_field = ft.TextField(label="Option D", value=question_data['option_d'])
+        correct_answer_field = ft.TextField(label="Correct Answer (a/b/c/d)", value=question_data['correct_answer'])
+
+        # Back button to return to the previous menu
+        back_button = ft.ElevatedButton("Back", on_click=lambda e: show_edit_quiz_page(page, quiz_id),
+                                        style=button_style)
+
+        # Save button to update question details
+        def save_question(e):
+            data = {
+                "id": question_id,
+                "question": question_field.value,
+                "option_a": option_a_field.value,
+                "option_b": option_b_field.value,
+                "option_c": option_c_field.value,
+                "option_d": option_d_field.value,
+                "correct_answer": correct_answer_field.value  # Should be one of 'a', 'b', 'c', or 'd'
+            }
+
+            try:
+                response = requests.patch(f"http://localhost:8000/api/quiz/{quiz_id}/questions/", json=data,
+                                          auth=(user_phone, user_password))
+                if response.status_code == 200:
+                    page.add(ft.Text("Question updated successfully!", color=ft.Colors.GREEN))
+                    show_edit_quiz_page(page, quiz_id)  # Navigate back to the edit quiz page
+                else:
+                    error_message = response.json().get('error', 'An unknown error occurred.')
+                    page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error updating question: {e}")
+                page.add(ft.Text("Failed to update question.", color=ft.Colors.RED))
+
+        save_button = ft.ElevatedButton("Save", on_click=save_question, style=button_style)
+
+        # Add all components to the page
+        page.add(title,
+                 question_field,
+                 option_a_field,
+                 option_b_field,
+                 option_c_field,
+                 option_d_field,
+                 correct_answer_field,
+                 save_button,
+                 back_button)
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching question details: {e}")
+        page.add(ft.Text("Failed to load question details.", color=ft.Colors.RED))
+
+    page.update()
+
+
+def show_add_question_page(page: ft.Page, quiz_id: int):
+    page.clean()  # Clear current content
+
+    title = ft.Text("Add a New Question", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    # Input fields for question details
+    question_field = ft.TextField(label="Question", autofocus=True)
+    option_a_field = ft.TextField(label="Option A")
+    option_b_field = ft.TextField(label="Option B")
+    option_c_field = ft.TextField(label="Option C")
+    option_d_field = ft.TextField(label="Option D")
+    correct_answer_field = ft.TextField(label="Correct Answer (a/b/c/d)")
+
+    def save_question(e):
+        data = {
+            "question": question_field.value,
+            "option_a": option_a_field.value,
+            "option_b": option_b_field.value,
+            "option_c": option_c_field.value,
+            "option_d": option_d_field.value,
+            "correct_answer": correct_answer_field.value  # Should be one of 'a', 'b', 'c', or 'd'
+        }
+
+        try:
+            response = requests.post(f"http://localhost:8000/api/quiz/{quiz_id}/questions/", json=data,
+                                     auth=(user_phone, user_password))
+            if response.status_code == 201:
+                page.add(ft.Text("Question added successfully!", color=ft.Colors.GREEN))
+                show_edit_quiz_page(page, quiz_id)  # Navigate back to the edit quiz page
+            else:
+                error_message = response.json().get('error', 'An unknown error occurred.')
+                page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error adding question: {e}")
+            page.add(ft.Text("Failed to add question.", color=ft.Colors.RED))
+
+    save_button = ft.ElevatedButton("Save", on_click=save_question, style=button_style)
+    cancel_button = ft.ElevatedButton("Cancel", on_click=lambda e: show_edit_quiz_page(page, quiz_id),
+                                      style=button_style)
+
+    page.add(title,
+             question_field,
+             option_a_field,
+             option_b_field,
+             option_c_field,
+             option_d_field,
+             correct_answer_field,
+             save_button,
+             cancel_button)
+
+    page.update()
 
 
 ft.app(target=main)

@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
 from .models import Quiz, Question
 from .serializers import QuizSerializer, QuestionSerializer
 from .permissions import IsOwnerOrAdmin, IsQuizOwnerOrAdmin
@@ -14,8 +15,21 @@ from account.models import Player
 
 
 class QuizViewSet(ModelViewSet):
-    queryset = Quiz.objects.filter(verified=True)
     serializer_class = QuizSerializer
+    queryset = Quiz.objects.filter(verified=True)
+
+    @action(detail=True, methods=['get'], url_name='get_my_quizzes', url_path='my_quizzes')
+    def my_quizzes(self, request, pk=None):
+        quizzes = Quiz.objects.filter(author_id=pk)
+        serializer = self.get_serializer(quizzes, many=True)
+        return Response(serializer.data)
+
+
+    def get_queryset(self):
+        if self.action == 'retrieve':
+            return Quiz.objects.all()
+        return self.queryset
+
 
     def get_permissions(self, *args, **kwargs):
         if self.action in ['list', 'create', 'retrieve']:
@@ -37,8 +51,12 @@ class QuestionView(APIView):
     def get(self, request, *args, **kwargs):
         quiz_id = kwargs.get('quiz')
         try:
-            questions = Quiz.objects.get(pk=quiz_id).questions.all()
-            serializer = QuestionSerializer(questions, many=True)
+            if 'id' in request.data:
+                question = Question.objects.get(id=request.data['id'])
+                serializer = QuestionSerializer(question)
+            else:
+                questions = Quiz.objects.get(pk=quiz_id).questions.all()
+                serializer = QuestionSerializer(questions, many=True)
             return Response(serializer.data)
         except Quiz.DoesNotExist:
             return Response({"detail": "Quiz not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -47,6 +65,7 @@ class QuestionView(APIView):
         quiz_id = kwargs.get('quiz')
         try:
             quiz = Quiz.objects.get(pk=quiz_id)
+            request.data.update({'quiz': quiz_id})
             serializer = QuestionSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(quiz=quiz)
