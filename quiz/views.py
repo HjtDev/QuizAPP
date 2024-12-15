@@ -42,6 +42,11 @@ class QuizViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        instance.verified = False
+        instance.save()
+
 
 class QuestionView(APIView):
     queryset = Question.objects.all()
@@ -83,6 +88,8 @@ class QuestionView(APIView):
             serializer = QuestionSerializer(question, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                quiz.verified = False
+                quiz.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Quiz.DoesNotExist:
