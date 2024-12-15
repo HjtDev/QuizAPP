@@ -9,7 +9,6 @@ from .models import Quiz, Question
 from .serializers import QuizSerializer, QuestionSerializer
 from .permissions import IsOwnerOrAdmin, IsQuizOwnerOrAdmin
 from rest_framework.views import APIView
-from datetime import datetime as dt
 from django.core.cache import cache
 from account.models import Player
 
@@ -26,7 +25,7 @@ class QuizViewSet(ModelViewSet):
 
 
     def get_queryset(self):
-        if self.action == 'retrieve':
+        if self.action == 'retrieve' or self.action == 'destroy':
             return Quiz.objects.all()
         return self.queryset
 
@@ -41,6 +40,11 @@ class QuizViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        instance.verified = False
+        instance.save()
 
 
 class QuestionView(APIView):
@@ -83,6 +87,8 @@ class QuestionView(APIView):
             serializer = QuestionSerializer(question, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                quiz.verified = False
+                quiz.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Quiz.DoesNotExist:

@@ -1,6 +1,7 @@
 import flet as ft
 import os
 import requests
+from time import sleep
 
 theme_color = ft.Colors.BLUE_400
 card_color = ft.Colors.GREY_800
@@ -24,6 +25,7 @@ selected_answers = {}
 
 def main(page: ft.Page):
     page.title = "Quiz Application"
+    page.scroll = ft.ScrollMode.AUTO
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.theme_mode = ft.ThemeMode.DARK
@@ -70,7 +72,83 @@ def show_login_form(page: ft.Page, phone: str = "", password: str = "", error_me
             show_main_menu(page)
 
     login_button = ft.ElevatedButton("Login", on_click=on_login_click, style=button_style)
-    page.add(title, phone_field, password_field, remember_me, login_button)
+
+    # Add Create Account Button
+    create_account_button = ft.ElevatedButton("Create a New Account",
+                                              on_click=lambda e: show_create_account_page(page),
+                                              style=button_style)
+
+    page.add(title, phone_field, password_field, remember_me,
+             ft.Row([login_button, create_account_button], spacing=10, alignment=ft.MainAxisAlignment.CENTER))
+
+
+def show_create_account_page(page: ft.Page):
+    page.clean()
+    title = ft.Text("Create Account", size=30, weight=ft.FontWeight.BOLD, color=text_color)
+
+    phone_field = ft.TextField(label="Phone", autofocus=True)
+    name_field = ft.TextField(label="Name")
+    display_name_field = ft.TextField(label="Display Name")
+    password_field = ft.TextField(label="Password", password=True)
+    confirm_password_field = ft.TextField(label="Confirm Password", password=True)
+
+    error_text = ft.Text("", color=ft.Colors.RED)
+
+    def on_register_click(e):
+        data = {
+            "phone": phone_field.value,
+            "name": name_field.value,
+            "display_name": display_name_field.value,
+            "password": password_field.value,
+        }
+
+        # Check if passwords match
+        if password_field.value != confirm_password_field.value:
+            error_text.value = "Passwords do not match."
+            page.add(error_text)
+            return
+
+        try:
+            response = requests.post("http://localhost:8000/api/account/register/", json=data)
+            print(response.json())
+            if response.status_code == 201:
+                # Successful registration
+                success_message = ft.Text("Account created successfully! You can now log in.", color=ft.Colors.GREEN)
+                page.add(success_message)
+                # Redirect to login form after a short delay
+                page.update()
+                sleep(2)  # Wait for 2 seconds to show the message
+                show_login_form(page)  # Redirect to login form
+            else:
+                # Handle errors
+                error_message = response.json()
+                error_text.value = ""
+                for field, messages in error_message.items():
+                    if field == 'non_field_errors':
+                        error_text.value += "\n".join(messages) + "\n"
+                    else:
+                        error_text.value += f"{field.capitalize()}: " + "\n".join(messages) + "\n"
+
+                page.add(error_text)
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error during registration: {e}")
+            error_text.value = "Failed to create account."
+            page.add(error_text)
+
+    register_button = ft.ElevatedButton("Register", on_click=on_register_click, style=button_style)
+    back_button = ft.ElevatedButton("Back to Login", on_click=lambda e: show_login_form(page), style=button_style)
+
+    page.add(title,
+             phone_field,
+             name_field,
+             display_name_field,
+             password_field,
+             confirm_password_field,
+             register_button,
+             back_button)
+
+    page.update()
 
 
 def authenticate_user(page: ft.Page, phone: str, password: str) -> bool:
@@ -101,11 +179,24 @@ def show_main_menu(page: ft.Page):
                                        width=200)
     exit_button = ft.ElevatedButton("Exit", on_click=lambda e: page.window_destroy(), style=button_style, width=200)
 
-    page.add(title,
-             start_quiz_button,
-             make_quiz_button,
-             account_button,
-             exit_button)
+    # Create a column to hold all items and center them
+    menu_column = ft.Column(
+        controls=[
+            title,
+            start_quiz_button,
+            make_quiz_button,
+            account_button,
+            exit_button
+        ],
+        alignment=ft.MainAxisAlignment.CENTER,  # Center items vertically
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,  # Center items horizontally
+        spacing=20,  # Add some spacing between items
+        height=page.window.height
+    )
+
+    # Add the column to the page
+    page.add(menu_column)
+    page.update()
 
 
 def show_account_info(page: ft.Page):
@@ -314,7 +405,7 @@ def show_quiz_questions(page: ft.Page, quiz_id: int):
         questions_data = response.json()
 
         # Create a scrollable column for questions
-        question_column = ft.Column(scroll=True)  # Make this column scrollable
+        question_column = ft.Column(scroll=ft.ScrollMode.ALWAYS)  # Make this column scrollable
 
         selected_answers.clear()  # Clear previous answers
 
@@ -335,7 +426,7 @@ def show_quiz_questions(page: ft.Page, quiz_id: int):
 
             # Create a container for the question and its options
             question_container = ft.Container(
-                content=ft.Column([question_text, radio_group]),
+                content=ft.Column([question_text, radio_group], scroll=ft.ScrollMode.AUTO),
                 padding=10,
                 bgcolor=card_color,
                 border_radius=10,
@@ -350,7 +441,7 @@ def show_quiz_questions(page: ft.Page, quiz_id: int):
 
         # Add everything to a container with fixed height to enable scrolling
         scrollable_container = ft.Container(
-            content=ft.Column([question_column, submit_button]),
+            content=ft.Column([question_column, submit_button], scroll=ft.ScrollMode.AUTO),
             height=page.height - 100  # Adjust height as needed
         )
 
@@ -465,7 +556,7 @@ def show_make_quiz_menu(page: ft.Page):
         response.raise_for_status()
         quizzes_data = response.json()
 
-        quiz_list = ft.Column()  # To hold the list of quizzes
+        quiz_list = ft.Column(scroll=ft.ScrollMode.ALWAYS)  # Make this column scrollable
 
         if quizzes_data:
             for quiz in quizzes_data:
@@ -473,9 +564,15 @@ def show_make_quiz_menu(page: ft.Page):
                 verified_text = ft.Text("Verified", color=ft.Colors.GREEN) if quiz['verified'] else ft.Text(
                     "Not Verified", color=ft.Colors.RED)
 
-                edit_button = ft.ElevatedButton("Edit", on_click=lambda e, quiz_id=quiz['id']: edit_quiz(page, quiz_id),
+                edit_button = ft.ElevatedButton("Edit",
+                                                on_click=lambda e, quiz_id=quiz['id']: edit_quiz(page, quiz_id),
                                                 style=button_style)
 
+                delete_button = ft.ElevatedButton("Delete",
+                                                  on_click=lambda e, quiz_id=quiz['id']: delete_quiz(page, quiz_id),
+                                                  style=button_style)
+
+                # Create a container for each quiz with buttons aligned properly
                 quiz_container = ft.Container(
                     content=ft.Row([
                         ft.Column([
@@ -483,7 +580,7 @@ def show_make_quiz_menu(page: ft.Page):
                             ft.Text(f"By: {author_display_name}", size=16),
                             verified_text
                         ], alignment=ft.MainAxisAlignment.START),
-                        edit_button
+                        ft.Row([edit_button, delete_button], spacing=10)  # Align buttons in a row
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     bgcolor=card_color,
                     border_radius=10,
@@ -505,8 +602,24 @@ def show_make_quiz_menu(page: ft.Page):
     add_quiz_button = ft.ElevatedButton("Add Quiz", on_click=lambda e: show_add_quiz_page(page), style=button_style)
     back_button = ft.ElevatedButton("Back to Main Menu", on_click=lambda e: show_main_menu(page), style=button_style)
 
+    # Add all components to the page
     page.add(title, quiz_list, add_quiz_button, back_button)
     page.update()
+
+
+def delete_quiz(page: ft.Page, quiz_id: int):
+    try:
+        response = requests.delete(f"http://localhost:8000/api/quiz/{quiz_id}/", auth=(user_phone, user_password))
+        if response.status_code == 204:
+            page.add(ft.Text("Quiz deleted successfully!", color=ft.Colors.GREEN))
+            show_make_quiz_menu(page)  # Refresh the list of quizzes
+        else:
+            error_message = response.json().get('error', 'An unknown error occurred.')
+            page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error deleting quiz: {e}")
+        page.add(ft.Text("Failed to delete quiz.", color=ft.Colors.RED))
 
 
 def show_add_quiz_page(page: ft.Page):
@@ -578,7 +691,7 @@ def show_edit_quiz_page(page: ft.Page, quiz_id: int):
         # Back button to return to the previous menu
         back_button = ft.ElevatedButton("Back", on_click=lambda e: show_make_quiz_menu(page), style=button_style)
 
-        # Add question button (no functionality for now)
+        # Add question button
         add_question_button = ft.ElevatedButton("Add Question",
                                                 on_click=lambda e: show_add_question_page(page, quiz_id),
                                                 style=button_style)
@@ -608,7 +721,7 @@ def show_edit_quiz_page(page: ft.Page, quiz_id: int):
         save_button = ft.ElevatedButton("Save", on_click=save_quiz, style=button_style)
 
         # Fetch questions for this quiz
-        questions_container = ft.Column()  # To hold the list of questions
+        questions_container = ft.Column(scroll=True)  # To hold the list of questions and make it scrollable
         try:
             questions_response = requests.get(f"http://localhost:8000/api/quiz/{quiz_id}/questions",
                                               auth=(user_phone, user_password))
@@ -618,16 +731,24 @@ def show_edit_quiz_page(page: ft.Page, quiz_id: int):
             if questions_data:
                 for question in questions_data:
                     question_title = ft.Text(question['question'], size=20)
+
                     edit_question_button = ft.ElevatedButton("Edit",
                                                              on_click=lambda e,
                                                                              question_id=question['id']: edit_question(
                                                                  page, question_id, quiz_id),
                                                              style=button_style)
 
+                    delete_question_button = ft.ElevatedButton("Delete",
+                                                               on_click=lambda e,
+                                                                               question_id=question[
+                                                                                   'id']: delete_question(
+                                                                   page, quiz_id, question_id),
+                                                               style=button_style)
+
                     question_container = ft.Container(
                         content=ft.Row([
                             question_title,
-                            edit_question_button
+                            ft.Row([edit_question_button, delete_question_button], spacing=10),
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                         bgcolor=card_color,
                         border_radius=10,
@@ -664,6 +785,24 @@ def show_edit_quiz_page(page: ft.Page, quiz_id: int):
         page.add(ft.Text("Failed to load quiz details.", color=ft.Colors.RED))
 
     page.update()
+
+
+def delete_question(page: ft.Page, quiz_id: int, question_id: int):
+    try:
+        response = requests.delete(f"http://localhost:8000/api/quiz/{quiz_id}/questions/",
+                                   json={"id": question_id},
+                                   auth=(user_phone, user_password))
+
+        if response.status_code == 204:
+            page.add(ft.Text("Question deleted successfully!", color=ft.Colors.GREEN))
+            show_edit_quiz_page(page, quiz_id)  # Refresh the question list
+        else:
+            error_message = response.json().get('error', 'An unknown error occurred.')
+            page.add(ft.Text(error_message, color=ft.Colors.RED))
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error deleting question: {e}")
+        page.add(ft.Text("Failed to delete question.", color=ft.Colors.RED))
 
 
 def edit_question(page: ft.Page, question_id: int, quiz_id: int):
