@@ -9,7 +9,6 @@ from .models import Quiz, Question
 from .serializers import QuizSerializer, QuestionSerializer
 from .permissions import IsOwnerOrAdmin, IsQuizOwnerOrAdmin
 from rest_framework.views import APIView
-from datetime import datetime as dt
 from django.core.cache import cache
 from account.models import Player
 
@@ -26,7 +25,7 @@ class QuizViewSet(ModelViewSet):
 
 
     def get_queryset(self):
-        if self.action == 'retrieve':
+        if self.action == 'retrieve' or self.action == 'destroy':
             return Quiz.objects.all()
         return self.queryset
 
